@@ -16,6 +16,20 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
+function randomNumber() {
+  const prefix = "VOL";
+  const year = new Date().getFullYear();
+  const randomNumber = Math.floor(10000000 + Math.random() * 90000000); // 8-digit random number
+
+  return `${prefix}-${year}-${randomNumber}`;
+}
+function generateUniqueValue() {
+  
+  const randomNumber = Math.floor(10000000 + Math.random() * 90000000); // 8-digit random number
+
+  return randomNumber;
+}
+
 app.use('/uploads', express.static('uploads'));
 // Connect to MongoDB
 mongoose.connect("mongodb+srv://satyampandit021:20172522@rvbmhotelbooking.9hfzkrx.mongodb.net/volbo?retryWrites=true&w=majority", {
@@ -32,6 +46,8 @@ const LeadSchema = new mongoose.Schema({
   mobile: String,
   pincode: String,
   state: String,
+  district: String,
+  selectedPostOfficeList:Array,
   approval_fees: String,
   agreementFees: String,
   securityMoney: String,
@@ -46,19 +62,36 @@ const LeadSchema = new mongoose.Schema({
   ifsc: String,
   branch: String,
   holder_name: String,
+  bank_name:String,
   block: {
     type: Boolean,
     default: false
   }
+},{
+  timestamps: true
 });
 const Lead = mongoose.model('Lead', LeadSchema);
+const proposalSchema = new mongoose.Schema({
+  name: String,
+  email: String,
+  mobile: String,
+  pincode: String,
+  state: String,
+  district: String,
+  post_offices:Array,
+},{
+  timestamps: true
+});
+const proposal = mongoose.model('proposal', proposalSchema);
 const bankSchema = new mongoose.Schema({
-
+bank_name: String,
   account_number: String,
   ifsc: String,
   branch: String,
   holder_name: String,
 
+},{
+  timestamps: true
 });
 const bank = mongoose.model('bank', bankSchema);
 
@@ -70,7 +103,8 @@ app.post('/create-lead', upload.fields([
   { name: 'photo', maxCount: 1 },
 
 ]), async (req, res) => {
-
+console.log(req.body.selectedPostOfficeList.split(',')
+.map(postOffice => postOffice.trim().toLowerCase()))
   try {
     if (req.body.id) {
       const lead = await Lead.findByIdAndUpdate(req.body.id, {
@@ -81,6 +115,8 @@ app.post('/create-lead', upload.fields([
         mobile: req.body.mobile,
         pincode: req.body.pincode,
         state: req.body.state,
+        district: req.body.district,
+        selectedPostOfficeList: req.body.selectedPostOfficeList,
         approval_fees: req.body.approval_fees,
         agreementFees: req.body.agreementFees,
         securityMoney: req.body.securityMoney,
@@ -93,15 +129,18 @@ app.post('/create-lead', upload.fields([
         ifsc: req.body.ifsc,
         branch: req.body.branch,
         holder_name: req.body.holder_name,
+        bank_name: req.body.bank_name
       })
     }
     const newLead = new Lead({
       username: req.body.username,
       email: req.body.email,
-      applicationNumber: Math.random().toString(36).substring(7),
-      documentNumber: Math.random().toString(36).substring(7),
+      applicationNumber: generateUniqueValue(),
+      documentNumber: randomNumber(),
       mobile: req.body.mobile,
       pincode: req.body.pincode,
+      district: req.body.district,
+      selectedPostOfficeList: req.body.selectedPostOfficeList,
       state: req.body.state,
       approval_fees: req.body.approval_fees,
       agreementFees: req.body.agreementFees,
@@ -112,9 +151,11 @@ app.post('/create-lead', upload.fields([
       aadhar: req.body.aadhar,
       pan: req.body.pan,
       account_number: req.body.account_number,
+      account_number: req.body.account_number,
       ifsc: req.body.ifsc,
       branch: req.body.branch,
-      holder_name: req.body.holder_name
+      holder_name: req.body.holder_name,
+      bank_name: req.body.bank_name
     });
 
     await newLead.save();
@@ -126,20 +167,27 @@ app.post('/create-lead', upload.fields([
 });
 
 app.post('/create-bank', async (req, res) => {
-  console.log(req.body)
   try {
-    const newLead = new bank({
-      account_number: req.body.account_number,
-      ifsc: req.body.ifsc,
-      branch: req.body.branch,
-      holder_name: req.body.holder_name
-    });
-    const sd = await newLead.save();
-    console.log(req.body)
-    res.json({ message: 'Lead created successfully!' });
+    const { account_number, ifsc, branch, bank_name, holder_name } = req.body;
+
+    // Find the bank by account_number and update or create a new document
+    const updatedBank = await bank.findOneAndUpdate(
+      { account_number }, // Find by account_number
+      { 
+        ifsc, 
+        branch, 
+        bank_name, 
+        holder_name 
+      },
+      { 
+        new: true, // Return the updated document
+        upsert: true, // Create a new document if none is found
+      }
+    );
+
+    res.json({ message: 'Bank details updated or created successfully!', bank: updatedBank });
   } catch (error) {
-    console.log(error)
-    res.status(500).json({ message: 'Error creating lead', error });
+    res.status(500).json({ message: 'Error creating or updating bank details', error });
   }
 });
 
@@ -151,24 +199,55 @@ app.get('/users', async (req, res) => {
     res.status(500).json({ message: 'Error retrieving leads', error });
   }
 })
-app.get('/bank', async (req, res) => {
+app.get('/proposals', async (req, res) => {
   try {
-    const leads = await Lead.findOne();
+    const leads = await proposal.find();
     res.json(leads);
   } catch (error) {
     res.status(500).json({ message: 'Error retrieving leads', error });
   }
 })
+app.get('/bank', async (req, res) => {
+  try {
+    // Assuming `created_at` is the field that stores the timestamp of insertion
+    const lastBank = await bank.findOne().sort({ created_at: 1 });
+    
+    if (!lastBank) {
+      return res.status(404).json({ message: 'No banks found' });
+    }
+    
+    res.json(lastBank);
+  } catch (error) {
+    res.status(500).json({ message: 'Error retrieving last added bank', error });
+  }
+});
 
 
 // Fetch User by ID
 app.get('/user/:id', async (req, res) => {
   try {
+     
     const user = await Lead.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     res.json(user);
   } catch (error) {
+    res.status(500).json({ message: 'Error fetching user data', error });
+  }
+});
+app.get('/userFromPDF/:id', async (req, res) => {
+  try {
+    const user = await Lead.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Find the last added bank (assuming 'createdAt' field exists)
+    const bankData = await bank.findOne().sort({ createdAt: -1 });
+
+    if (!bankData) return res.status(404).json({ message: 'Bank details not found' });
+
+    res.json({ ...user.toObject(), ...bankData.toObject() });
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ message: 'Error fetching user data', error });
   }
 });
@@ -192,42 +271,99 @@ app.get('/user/deleteButton/:id', async (req, res) => {
     res.status(500).json({ message: 'Error fetching user data', error });
   }
 });
+app.delete('/proposals/:id', async (req, res) => {
+  try {
+    const user = await proposal.findByIdAndDelete(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching user data', error });
+  }
+});
 app.get('/user/step1WelcomeMAil/:id', async (req, res) => {
-
+ 
   try {
     const user = await Lead.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
     await sendMail(user);
     res.json(user);
   } catch (error) {
-    console.log(error)
+      
     res.status(500).json({ message: 'Error fetching user data', error });
   }
 });
 app.get('/user/login/:doc/:mobile', async (req, res) => {
-console.log( req.params)
+ console.log(req.params)
   try {
     const user = await Lead.findOne({ documentNumber: req.params.doc, mobile: req.params.mobile });
     if (!user) return res.status(404).json({ message: 'User not found' });
-   console.log(user)
+    
     res.json(user);
   } catch (error) {
-    console.log(error)
+   
     res.status(500).json({ message: 'Error fetching user data', error });
   }
 });
 app.post('/create-proposal', async (req, res) => {
   try {
- console.log(req.body)
+//  console.log(req.body)
+ const newLead = new proposal(req.body);
+    await newLead.save();
     await sendProposalMail(req.body);
-    res.json( { message: 'Create proposal'});
+    
+    res.json( { message: 'New Proposal created successfully!'});
   } catch (error) {
     console.log(error)
+    res.status(500).json({ message: 'Error fetching user data', error });
+  } 
+});
+app.post('/user/contactus', async (req, res) => {
+  try {
+ 
+    await sendMailToEmail(req.body);
+    res.json( { message: 'Create proposal'});
+  } catch (error) {
+   
     res.status(500).json({ message: 'Error fetching user data', error });
   }
 });
 
 
+
+const sendMailToEmail = async (user) => {
+  const transporter = nodemailer.createTransport({
+    host: "mail.valmodelivery.com",
+    port: 465, // Secure SSL/TLS SMTP Port
+    secure: true, // SSL/TLS
+    auth: {
+      user: "hello@valmodelivery.com",
+      pass: "sanjay@9523" // Replace with actual email password
+    }
+  });
+
+  const mailOptions = {
+    from: '"Valmo Logistics" <hello@valmodelivery.com>',
+    to: "usercontact@valmodelivery.com",
+    subject: "New User Contacted Via Contact Us Form",
+    html: `
+      <h2>New Contact Form Submission</h2>
+      <p><strong>Name:</strong> ${user.name}</p>
+      <p><strong>Email:</strong> ${user.email}</p>
+      <p><strong>Phone:</strong> ${user.phone}</p>
+      <p><strong>Message:</strong></p>
+      <p>${user.message}</p>
+      <br>
+      <p>Sent from valmodelivery.com</p>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log("Email sent successfully to", user.email);
+  } catch (error) {
+    console.error("Error sending email:", error);
+  }
+};
 
 
 const sendMail = async (user) => {
@@ -270,8 +406,13 @@ const sendMail = async (user) => {
                   <h3>Application Details</h3>
                   <p><strong>Application No.:</strong> ${user.applicationNumber}</p>
                   <p><strong>Application Status:</strong> Approved</p>
-                  <p><strong>Allocated Location:</strong> ${user.address}</p>
-
+                  
+ <ul><strong>Allocated Location:</strong> 
+        ${
+          user.selectedPostOfficeList.map((post_office) => `<li>${post_office}</li>`)
+        }
+          
+        </ul>
                   <h3>Recipient Details</h3>
                   <p><strong>Name:</strong> ${user.username}</p>
                   <p><strong>Address:</strong> ${user.address}</p>
