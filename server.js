@@ -493,7 +493,7 @@ const sendMail = async (user) => {
                   <p><strong>Email ID:</strong> ${user.email}</p>
 
                   <h3>Login Details</h3>
-                  <p><strong>Login ID/Application No.:</strong> ${user.applicationNumber}</p>
+                  <p><strong>Login ID/Document No.:</strong> ${user.documentNumber}</p>
                   <p><strong>Password:</strong> ${user.mobile}</p>
 
                   <p>For more details, visit our website:</p>
