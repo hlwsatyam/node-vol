@@ -94,7 +94,52 @@ bank_name: String,
   timestamps: true
 });
 const bank = mongoose.model('bank', bankSchema);
+ 
 
+const FranchiseSchema = new mongoose.Schema({
+    full_name: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    email: {
+        type: String,
+        required: true,
+        trim: true,
+        lowercase: true
+    },
+    contact_number: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    pin_code: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    city: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    Franchise_type: {
+        type: String,
+        enum: ["Delivery Franchise", "District Franchise Hub"], // Allowed values
+        default: "Delivery Franchise"
+    },
+    state: {
+        type: String,
+        default: "SelectState"
+    },
+    district: {
+        type: String,
+        required: true,
+        trim: true
+    }
+}, { timestamps: true }); // Adds createdAt & updatedAt
+
+const Franchise = mongoose.model("Franchise", FranchiseSchema);
 app.get('/', async (req, res) => {
   res.send('ffff')
 })
@@ -165,6 +210,19 @@ console.log(req.body.selectedPostOfficeList.split(',')
     res.status(500).json({ message: 'Error creating lead', error });
   }
 });
+app.post('/franchise', async (req, res) => {
+ console.log(req.body)
+  try {
+   
+    const newLead = new Franchise( req.body);
+
+    await newLead.save();
+    res.json({ message: 'Lead created successfully!' });
+  } catch (error) {
+    console.log(error)
+    res.status(500).json({ message: 'Error creating lead', error });
+  }
+});
 
 app.post('/create-bank', async (req, res) => {
   try {
@@ -207,6 +265,21 @@ app.get('/proposals', async (req, res) => {
     res.status(500).json({ message: 'Error retrieving leads', error });
   }
 })
+ 
+app.get('/getfranch', async (req, res) => {
+  try {
+    // Assuming `created_at` is the field that stores the timestamp of insertion
+    const lastBank = await Franchise.find().sort({ created_at: 1 });
+    
+    if (!lastBank) {
+      return res.status(404).json({ message: 'No banks found' });
+    }
+    
+    res.json(lastBank);
+  } catch (error) {
+    res.status(500).json({ message: 'Error retrieving last added bank', error });
+  }
+});
 app.get('/bank', async (req, res) => {
   try {
     // Assuming `created_at` is the field that stores the timestamp of insertion
