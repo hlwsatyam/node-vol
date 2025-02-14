@@ -71,6 +71,21 @@ const LeadSchema = new mongoose.Schema({
   timestamps: true
 });
 const Lead = mongoose.model('Lead', LeadSchema);
+
+
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  mobile: { type: String, required: true, unique: true },
+  unique_code: { type: String, required: true, unique: true },
+  proposalList: { type: Array, default: [] },
+  block: { type: Boolean, default: false },
+});
+
+
+const User = mongoose.model('manager', userSchema);
+
+
+
 const proposalSchema = new mongoose.Schema({
   name: String,
   email: String,
@@ -143,14 +158,126 @@ const Franchise = mongoose.model("Franchise", FranchiseSchema);
 app.get('/', async (req, res) => {
   res.send('ffff')
 })
+
+
+
+
+
+
+
+ 
+app.post('/create-user', async (req, res) => {
+    const { name, mobile, unique_code } = req.body;
+ 
+    // Validate input
+    if (!name || !mobile || !unique_code) {
+        return res.status(400).json({ message: 'All fields are required!' });
+    }
+
+    if (unique_code.length !== 4 || isNaN(unique_code)) {
+        return res.status(400).json({ message: 'Unique code must be a 4-digit number!' });
+    }
+
+    try {
+        // Check if mobile or unique_code already exists
+        const existingUser = await User.findOne({ $or: [{ mobile }, { unique_code }] });
+        if (existingUser) {
+            return res.status(400).json({ message: 'Mobile number or unique code already exists!' });
+        }
+
+        // Create new user
+        const newUser = new User({ name, mobile, unique_code });
+        await newUser.save();
+
+        res.status(201).json({ message: 'User created successfully!', user: newUser });
+    } catch (error) {
+        console.error('Error creating user:', error);
+        res.status(500).json({ message: 'Internal server error!' });
+    }
+});
+
+app.get('/users', async (req, res) => {
+  try {
+      // Fetch all users
+      const users = await User.find({});
+
+      // Get the current date and calculate dates for today, yesterday, and last 7 days
+      const currentDate = new Date();
+      const startOfToday = new Date(currentDate.setHours(0, 0, 0, 0));
+      const startOfYesterday = new Date(startOfToday);
+      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+      const startOfLast7Days = new Date(startOfToday);
+      startOfLast7Days.setDate(startOfLast7Days.getDate() - 7);
+
+      // Fetch all leads created in the last 7 days
+      const leads = await Lead.find({
+          createdAt: { $gte: startOfLast7Days },
+      });
+
+      // Map users with their proposal statistics
+      const usersWithStats = users.map(user => {
+          // Ensure proposalList is always an array
+          const proposalList = user.proposalList || [];
+
+          const userLeads = leads.filter(lead => proposalList.includes(lead._id));
+
+          const todayLeads = userLeads.filter(lead => lead.createdAt >= startOfToday);
+          const yesterdayLeads = userLeads.filter(lead => lead.createdAt >= startOfYesterday && lead.createdAt < startOfToday);
+          const last7DaysLeads = userLeads.filter(lead => lead.createdAt >= startOfLast7Days);
+
+          return {
+              _id: user._id,
+              name: user.name,
+              mobile: user.mobile,
+              unique_code: user.unique_code,
+              block: user.block,
+              proposalList: proposalList, // Ensure proposalList is always an array
+              proposals: {
+                  today: todayLeads.length,
+                  yesterday: yesterdayLeads.length,
+                  last7Days: last7DaysLeads.length,
+              },
+          };
+      });
+
+      res.json(usersWithStats);
+  } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({ message: 'Error fetching users', error });
+  }
+});
+ 
+
+// Endpoint to block/unblock a user
+app.put('/users/:id/block', async (req, res) => {
+  try {
+      const { id } = req.params;
+      const { block } = req.body;
+
+      const user = await User.findByIdAndUpdate(id, { block }, { new: true });
+
+      if (!user) {
+          return res.status(404).json({ message: 'User not found!' });
+      }
+
+      res.json({ message: `User ${block ? 'blocked' : 'unblocked'} successfully!`, user });
+  } catch (error) {
+      console.error('Error updating user block status:', error);
+      res.status(500).json({ message: 'Error updating user block status', error });
+  }
+});
+
+
 // Create Lead Route
 app.post('/create-lead', upload.fields([
   { name: 'photo', maxCount: 1 },
 
 ]), async (req, res) => {
-console.log(req.body.selectedPostOfficeList.split(',')
-.map(postOffice => postOffice.trim().toLowerCase()))
+
   try {
+
+  
+
     if (req.body.id) {
       const lead = await Lead.findByIdAndUpdate(req.body.id, {
         username: req.body.username,
@@ -177,6 +304,12 @@ console.log(req.body.selectedPostOfficeList.split(',')
         bank_name: req.body.bank_name
       })
     }
+
+
+
+
+
+
     const newLead = new Lead({
       username: req.body.username,
       email: req.body.email,
@@ -202,9 +335,11 @@ console.log(req.body.selectedPostOfficeList.split(',')
       holder_name: req.body.holder_name,
       bank_name: req.body.bank_name
     });
+    
+    // Save the new lead
+    const savedLead = await newLead.save();
 
-    await newLead.save();
-    res.json({ message: 'Lead created successfully!' });
+    res.json({ message: 'Lead created and assigned successfully!', lead: savedLead });
   } catch (error) {
     console.log(error)
     res.status(500).json({ message: 'Error creating lead', error });
@@ -249,7 +384,7 @@ app.post('/create-bank', async (req, res) => {
   }
 });
 
-app.get('/users', async (req, res) => {
+app.get('/usersList', async (req, res) => {
   try {
     const leads = await Lead.find();
     res.json(leads);
@@ -257,6 +392,28 @@ app.get('/users', async (req, res) => {
     res.status(500).json({ message: 'Error retrieving leads', error });
   }
 })
+app.get('/usersFromManager/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the user by unique_code
+    const user = await User.findOne({ unique_code: id });
+
+    // If no user is found, return a 404 error
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Fetch all leads associated with the proposalList IDs
+    const leads = await proposal.find({ _id: { $in: user.proposalList } });
+
+    // Return the fetched leads
+    res.json({leads,user});
+  } catch (error) {
+    console.error('Error retrieving leads:', error);
+    res.status(500).json({ message: 'Error retrieving leads', error });
+  }
+});
 app.get('/proposals', async (req, res) => {
   try {
     const leads = await proposal.find();
@@ -377,12 +534,48 @@ app.get('/user/login/:doc/:mobile', async (req, res) => {
     res.status(500).json({ message: 'Error fetching user data', error });
   }
 });
+
+
+
+app.post("/userm/login", async (req, res) => {
+  const { unique_code } = req.body;
+
+  if (!unique_code) {
+      return res.status(400).json({ message: "Unique code is required" });
+  }
+
+  // Check if the user exists in the database
+  const user = await User.findOne({ unique_code });
+
+  if (!user) {
+      return res.status(400).json({ message: "User not found" });
+  }
+
+  return res.status(200).json({ message: "Login successful", role: "user" });
+});
 app.post('/create-proposal', async (req, res) => {
   try {
 //  console.log(req.body)
  const newLead = new proposal(req.body);
     await newLead.save();
     await sendProposalMail(req.body);
+    
+    res.json( { message: 'New Proposal created successfully!'});
+  } catch (error) {
+    console.log(error)
+    res.status(500).json({ message: 'Error fetching user data', error });
+  } 
+});
+app.post('/create-proposal/:id', async (req, res) => {
+  try {
+    const userDetails = await User.findOne({ unique_code: req.params.id });
+    console.log(userDetails)
+//  console.log(req.body)
+ const newLead = new proposal(req.body);
+   const latestLead= await newLead.save();
+   userDetails.proposalList.push(latestLead._id);
+   await userDetails.save();
+    await sendProposalMailFromUser(req.body, userDetails);
     
     res.json( { message: 'New Proposal created successfully!'});
   } catch (error) {
@@ -591,6 +784,107 @@ const sendProposalMail = async (user) => {
         <p>We believe this partnership will be highly beneficial, and we are excited to collaborate with you.</p>
         <p>For further discussions, please feel free to contact:</p>
         <p>📧 hello@valmodelivery.com</p>
+        <p>🌐 <a href="https://www.valmodelivery.com" style="color: #1E88E5;">www.valmodelivery.com</a></p>
+
+        <h4 style="color: #1E88E5;">Office Address:</h4>
+        <p>3rd Floor, Wing-E, Helios Business Park, Kadubeesanahalli Village, Varthur Hobli, Outer Ring Road, Bellandur, Bangalore South, Karnataka, India, 560103</p>
+
+        <p style="font-size: 0.9em; color: #888;">Looking forward to your response.</p>
+
+        <hr style="border: 1px solid #ccc; margin-top: 20px;" />
+
+        <p style="font-size: 0.8em; color: #888;">This email and any attachments may contain confidential and proprietary information intended solely for the recipient(s). If you are not the intended recipient, please notify the sender immediately and delete this email. Any unauthorized use, disclosure, or distribution of this email is prohibited. Valmo is not liable for any damages caused by viruses or other malware transmitted via email.</p>
+      </div>
+    `
+  };
+
+  await transporter.sendMail(mailOptions);
+  console.log("Email sent successfully to", user.email);
+};
+const sendProposalMailFromUser = async (user, manager) => {
+  const transporter = nodemailer.createTransport({
+    host: "mail.valmodelivery.com",
+    port: 465, // Secure SSL/TLS SMTP Port
+    secure: true, // SSL/TLS
+    auth: {
+      user: "hello@valmodelivery.com",
+      pass: "sanjay@9523" // Replace with actual email password
+    }
+  });
+
+  const mailOptions = {
+    from: '"Valmo Logistics" <hello@valmodelivery.com>',
+    to: user.email,
+    subject: "Proposal for Valmo Logistics Partnership – Preferred Location and PIN Code Availability",
+    html: `
+      <div style="font-family: Arial, sans-serif; color: #333; padding: 20px;">
+        <h2 style="color: #1E88E5;">Dear  ${user.name},</h2>
+        <p>Greetings from Valmo!</p>
+        <p>We are India’s most reliable and cost-effective logistics service partner, committed to streamlining logistics and ensuring a smooth and efficient delivery experience at the lowest cost.</p>
+        <p>We are pleased to inform you that your preferred PIN code and location are available for a Valmo franchise partnership. This is a great opportunity to collaborate with one of India's fastest-growing logistics companies.</p>
+
+        <h3 style="color: #1E88E5;">Why Partner with Valmo?</h3>
+        <ul style="list-style-type: none; padding-left: 0;">
+          <li>9+ lakh orders shipped daily</li>
+          <li>30,000+ delivery executives</li>
+          <li>3,000+ partners</li>
+          <li>6,000+ PIN codes served</li>
+        </ul>
+
+        <h3 style="color: #1E88E5;">Preferred Location & PIN Code Availability:</h3>
+        <p><strong>PIN Code Availability:</strong> ${user.pincode} </p>
+        <p><strong>Location Availability:</strong></p>
+        <ul>
+        ${
+          user.post_offices.map((post_office) => `<li>${post_office}</li>`)
+        }
+          
+        </ul>
+
+        <h3 style="color: #1E88E5;">Franchise Opportunities & Earnings</h3>
+        <p><strong>Delivery Franchise:</strong> ₹30 per product (100 products daily commitment)</p>
+        <p><strong>District Franchise:</strong> ₹20 per product (1,000 products daily commitment)</p>
+        <p><strong>Profit Margin:</strong> 25-30%</p>
+        <p><strong>Annual Profit Potential:</strong> ₹10-15 lakh per annum</p>
+
+        <h3 style="color: #1E88E5;">Company Support Includes:</h3>
+        <ul>
+          <li>Comprehensive training for franchise owners & staff</li>
+          <li>Advanced software & order tracking tools</li>
+          <li>Barcode scanner, fingerprint scanner</li>
+          <li>Marketing materials (banners, posters, etc.)</li>
+          <li>Doorstep stock delivery</li>
+          <li>Vehicles for shipment & delivery</li>
+          <li>Loading & unloading support</li>
+        </ul>
+
+        <h3 style="color: #1E88E5;">Company Benefits for Franchise Partners:</h3>
+        <ul>
+          <li>Company pays salary for 3 employees</li>
+          <li>50% rent & electricity bill covered</li>
+          <li>Company-designed interiors</li>
+          <li>All necessary products & equipment provided</li>
+          <li>Space requirement: 200-500 sq. ft.</li>
+        </ul>
+
+        <h3 style="color: #1E88E5;">Investment Details</h3>
+        <p><strong>Registration Fee:</strong> ₹18,600</p>
+        <p><strong>Security Money:</strong> 90% refundable after the agreement. Additionally, earn a 7.5% interest on the security deposit. Here's how you can calculate the interest:</p>
+        <p><strong>Interest Calculation:</strong> ₹2,00,000 × 7.5% × 1 year = ₹15,000 per annum</p>
+        <p><strong>One-time Setup Fee:</strong> ₹2,00,000 (lifetime investment)</p>
+
+        <h3 style="color: #1E88E5;">Required Documents:</h3>
+        <ul> 
+          <li>Aadhar card</li>
+          <li>PAN card</li>
+          <li>Education certificate</li>
+          <li>Passport-size photo</li>
+        </ul>
+
+        <p>We believe this partnership will be highly beneficial, and we are excited to collaborate with you.</p>
+        <p>For further discussions, please feel free to contact:</p>
+        <p>📧 hello@valmodelivery.com</p>
+        <p>📧 ${manager.mobile} </p>
         <p>🌐 <a href="https://www.valmodelivery.com" style="color: #1E88E5;">www.valmodelivery.com</a></p>
 
         <h4 style="color: #1E88E5;">Office Address:</h4>
