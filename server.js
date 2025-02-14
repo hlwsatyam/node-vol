@@ -4,42 +4,31 @@ const cors = require("cors");
 const multer = require('multer');
 const nodemailer = require('nodemailer');
 const app = express();
-
 // Middleware
 app.use(express.json());
 app.use(cors());
-
-
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
   filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
 });
 const upload = multer({ storage: storage });
-
 function randomNumber() {
   const prefix = "VOL";
   const year = new Date().getFullYear();
   const randomNumber = Math.floor(10000000 + Math.random() * 90000000); // 8-digit random number
-
   return `${prefix}-${year}-${randomNumber}`;
 }
 function generateUniqueValue() {
-  
   const randomNumber = Math.floor(10000000 + Math.random() * 90000000); // 8-digit random number
-
   return randomNumber;
 }
-
 app.use('/uploads', express.static('uploads'));
 // Connect to MongoDB
 mongoose.connect("mongodb+srv://satyampandit021:20172522@rvbmhotelbooking.9hfzkrx.mongodb.net/volbo?retryWrites=true&w=majority", {
-
 })
   .then(() => console.log("MongoDB connected"))
   .catch(err => console.log(err));
-
 // Define Schema and Model
-
 const LeadSchema = new mongoose.Schema({
   username: String,
   email: String,
@@ -71,21 +60,15 @@ const LeadSchema = new mongoose.Schema({
   timestamps: true
 });
 const Lead = mongoose.model('Lead', LeadSchema);
-
-
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   mobile: { type: String, required: true, unique: true },
   unique_code: { type: String, required: true, unique: true },
   proposalList: { type: Array, default: [] },
+  leadList: { type: Array, default: [] },
   block: { type: Boolean, default: false },
 });
-
-
 const User = mongoose.model('manager', userSchema);
-
-
-
 const proposalSchema = new mongoose.Schema({
   name: String,
   email: String,
@@ -109,8 +92,6 @@ bank_name: String,
   timestamps: true
 });
 const bank = mongoose.model('bank', bankSchema);
- 
-
 const FranchiseSchema = new mongoose.Schema({
     full_name: {
         type: String,
@@ -153,19 +134,10 @@ const FranchiseSchema = new mongoose.Schema({
         trim: true
     }
 }, { timestamps: true }); // Adds createdAt & updatedAt
-
 const Franchise = mongoose.model("Franchise", FranchiseSchema);
 app.get('/', async (req, res) => {
   res.send('ffff')
 })
-
-
-
-
-
-
-
- 
 app.post('/create-user', async (req, res) => {
     const { name, mobile, unique_code } = req.body;
  
@@ -195,7 +167,6 @@ app.post('/create-user', async (req, res) => {
         res.status(500).json({ message: 'Internal server error!' });
     }
 });
-
 app.get('/users', async (req, res) => {
   try {
       // Fetch all users
@@ -246,8 +217,6 @@ app.get('/users', async (req, res) => {
       res.status(500).json({ message: 'Error fetching users', error });
   }
 });
- 
-
 // Endpoint to block/unblock a user
 app.put('/users/:id/block', async (req, res) => {
   try {
@@ -266,8 +235,6 @@ app.put('/users/:id/block', async (req, res) => {
       res.status(500).json({ message: 'Error updating user block status', error });
   }
 });
-
-
 // Create Lead Route
 app.post('/create-lead', upload.fields([
   { name: 'photo', maxCount: 1 },
@@ -345,6 +312,86 @@ app.post('/create-lead', upload.fields([
     res.status(500).json({ message: 'Error creating lead', error });
   }
 });
+app.post('/create-lead-By-Manager', upload.fields([
+  { name: 'photo', maxCount: 1 },
+
+]), async (req, res) => {
+
+  try {
+
+  
+let user
+    if (req.body.managerid) {
+        user = await User.findOne({unique_code: req.body.managerid})
+    }
+    if (req.body.id) {
+      const lead = await Lead.findByIdAndUpdate(req.body.id, {
+        username: req.body.username,
+        email: req.body.email,
+        //applicationNumber:Math.random().toString(36).substring(7),
+        // documentNumber:Math.random().toString(36).substring(7),
+        mobile: req.body.mobile,
+        pincode: req.body.pincode,
+        state: req.body.state,
+        district: req.body.district,
+        selectedPostOfficeList: req.body.selectedPostOfficeList,
+        approval_fees: req.body.approval_fees,
+        agreementFees: req.body.agreementFees,
+        securityMoney: req.body.securityMoney,
+        father_name: req.body.father_name,
+        address: req.body.address,
+        // photo: req.files['photo'][0].path,
+        aadhar: req.body.aadhar,
+        pan: req.body.pan,
+        account_number: req.body.account_number,
+        ifsc: req.body.ifsc,
+        branch: req.body.branch,
+        holder_name: req.body.holder_name,
+        bank_name: req.body.bank_name
+      })
+    }
+
+
+
+
+
+
+    const newLead = new Lead({
+      username: req.body.username,
+      email: req.body.email,
+      applicationNumber: generateUniqueValue(),
+      documentNumber: randomNumber(),
+      mobile: req.body.mobile,
+      pincode: req.body.pincode,
+      district: req.body.district,
+      selectedPostOfficeList: req.body.selectedPostOfficeList,
+      state: req.body.state,
+      approval_fees: req.body.approval_fees,
+      agreementFees: req.body.agreementFees,
+      securityMoney: req.body.securityMoney,
+      father_name: req.body.father_name,
+      address: req.body.address,
+      photo: req.files['photo'][0].path,
+      aadhar: req.body.aadhar,
+      pan: req.body.pan,
+      account_number: req.body.account_number,
+      account_number: req.body.account_number,
+      ifsc: req.body.ifsc,
+      branch: req.body.branch,
+      holder_name: req.body.holder_name,
+      bank_name: req.body.bank_name
+    });
+    
+    // Save the new lead
+    const savedLead = await newLead.save();
+     user.leadList.push(savedLead._id);
+    await user.save();
+    res.json({ message: 'Lead created and assigned successfully!', lead: savedLead });
+  } catch (error) {
+    console.log(error)
+    res.status(500).json({ message: 'Error creating lead', error });
+  }
+});
 app.post('/franchise', async (req, res) => {
  console.log(req.body)
   try {
@@ -358,7 +405,6 @@ app.post('/franchise', async (req, res) => {
     res.status(500).json({ message: 'Error creating lead', error });
   }
 });
-
 app.post('/create-bank', async (req, res) => {
   try {
     const { account_number, ifsc, branch, bank_name, holder_name } = req.body;
@@ -383,7 +429,6 @@ app.post('/create-bank', async (req, res) => {
     res.status(500).json({ message: 'Error creating or updating bank details', error });
   }
 });
-
 app.get('/usersList', async (req, res) => {
   try {
     const leads = await Lead.find();
@@ -392,10 +437,20 @@ app.get('/usersList', async (req, res) => {
     res.status(500).json({ message: 'Error retrieving leads', error });
   }
 })
+app.get('/usersList/:id', async (req, res) => {
+  try {
+    const user= await User.findOne({unique_code:req.params.id})
+    const leads = await Lead.find({_id:{$in:user.leadList}});
+    res.json(leads);
+     
+  } catch (error) {
+    res.status(500).json({ message: 'Error retrieving leads', error });
+  }
+})
 app.get('/usersFromManager/:id', async (req, res) => {
   try {
     const { id } = req.params;
-
+   
     // Find the user by unique_code
     const user = await User.findOne({ unique_code: id });
 
@@ -422,7 +477,6 @@ app.get('/proposals', async (req, res) => {
     res.status(500).json({ message: 'Error retrieving leads', error });
   }
 })
- 
 app.get('/getfranch', async (req, res) => {
   try {
     // Assuming `created_at` is the field that stores the timestamp of insertion
@@ -451,8 +505,6 @@ app.get('/bank', async (req, res) => {
     res.status(500).json({ message: 'Error retrieving last added bank', error });
   }
 });
-
-
 // Fetch User by ID
 app.get('/user/:id', async (req, res) => {
   try {
@@ -522,6 +574,18 @@ app.get('/user/step1WelcomeMAil/:id', async (req, res) => {
     res.status(500).json({ message: 'Error fetching user data', error });
   }
 });
+app.get('/user/step1WelcomeMAil/:id', async (req, res) => {
+ 
+  try {
+    const user = await Lead.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    await send2Mail(user);
+    res.json(user);
+  } catch (error) {
+      
+    res.status(500).json({ message: 'Error fetching user data', error });
+  }
+});
 app.get('/user/login/:doc/:mobile', async (req, res) => {
  console.log(req.params)
   try {
@@ -534,9 +598,6 @@ app.get('/user/login/:doc/:mobile', async (req, res) => {
     res.status(500).json({ message: 'Error fetching user data', error });
   }
 });
-
-
-
 app.post("/userm/login", async (req, res) => {
   const { unique_code } = req.body;
 
@@ -593,9 +654,6 @@ app.post('/user/contactus', async (req, res) => {
     res.status(500).json({ message: 'Error fetching user data', error });
   }
 });
-
-
-
 const sendMailToEmail = async (user) => {
   const transporter = nodemailer.createTransport({
     host: "mail.valmodelivery.com",
@@ -630,9 +688,76 @@ const sendMailToEmail = async (user) => {
     console.error("Error sending email:", error);
   }
 };
-
-
 const sendMail = async (user) => {
+  const transporter = nodemailer.createTransport({
+    host: "mail.valmodelivery.com",
+    port: 465, // Secure SSL/TLS SMTP Port
+    secure: true, // SSL/TLS
+    auth: {
+      user: "hello@valmodelivery.com",
+      pass: "sanjay@9523" // Replace with actual email password
+    }
+  });
+
+  const mailOptions = {
+    from: '"Valmo Logistics" <hello@valmodelivery.com>',
+    to: user.email,
+    subject: "Your Application Has Been Approved – Partnership Opportunity with Valmo Logistics",
+    html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
+              <div style="max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px;">
+                  <h2 style="text-align: center; color: #333;">Greetings from Valmo!</h2>
+                  <p>Dear <strong>${user.username}</strong>,</p>
+                  <p>We are India's most reliable and cost-effective logistics service provider, committed to streamlining the delivery process.</p>
+
+                  <h3>Why Partner with Valmo?</h3>
+                  <ul>
+                      <li>✔ 9+ lakh orders shipped per day</li>
+                      <li>✔ 30,000+ delivery executives</li>
+                      <li>✔ 3,000+ partners</li>
+                      <li>✔ 6,000+ PIN codes covered</li>
+                  </ul>
+
+                  <h3>Franchise Opportunities</h3>
+                  <p>We invite you to join us as a Delivery Partner or District Franchisee:</p>
+                  <ul>
+                      <li>✅ Profit Margin: 25-30% of total revenue</li>
+                      <li>✅ Annual Profit Potential: ₹10-15 lakh per annum</li>
+                  </ul>
+
+                  <h3>Application Details</h3>
+                  <p><strong>Application No.:</strong> ${user.applicationNumber}</p>
+                  <p><strong>Application Status:</strong> Approved</p>
+                  
+ <ul><strong>Allocated Location:</strong> 
+        ${
+          user.selectedPostOfficeList.map((post_office) => `<li>${post_office}</li>`)
+        }
+          
+        </ul>
+                  <h3>Recipient Details</h3>
+                  <p><strong>Name:</strong> ${user.username}</p>
+                  <p><strong>Address:</strong> ${user.address}</p>
+                  <p><strong>Mobile No.:</strong> ${user.mobile}</p>
+                  <p><strong>Email ID:</strong> ${user.email}</p>
+
+                  <h3>Login Details</h3>
+                  <p><strong>Login ID/Document No.:</strong> ${user.documentNumber}</p>
+                  <p><strong>Password:</strong> ${user.mobile}</p>
+
+                  <p>For more details, visit our website:</p>
+                  <p><a href="https://www.valmodelivery.com" style="color: blue;">www.valmodelivery.com</a></p>
+
+                  <p style="text-align: center; font-weight: bold;">Best Regards, <br> Valmo Logistics Franchisee Development Team</p>
+              </div>
+          </div>
+      `
+  };
+
+  await transporter.sendMail(mailOptions);
+  console.log("Email sent successfully to", user.email);
+};
+const send2Mail = async (user) => {
   const transporter = nodemailer.createTransport({
     host: "mail.valmodelivery.com",
     port: 465, // Secure SSL/TLS SMTP Port
@@ -902,20 +1027,6 @@ const sendProposalMailFromUser = async (user, manager) => {
   await transporter.sendMail(mailOptions);
   console.log("Email sent successfully to", user.email);
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 app.post("/admin/login", async (req, res) => {
   const { username, password } = req.body;
 
@@ -928,20 +1039,6 @@ app.post("/admin/login", async (req, res) => {
 
   return res.status(400).json({ message: "Admin not found" });
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Start Server
 const PORT =process.env.PORT || 5000;
 app.listen(PORT, () => {
