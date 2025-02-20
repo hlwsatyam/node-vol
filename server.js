@@ -24,8 +24,8 @@ function generateUniqueValue() {
 }
 app.use('/uploads', express.static('uploads'));
 // Connect to MongoDB
-mongoose.connect("mongodb+srv://satyampandit021:20172522@rvbmhotelbooking.9hfzkrx.mongodb.net/volbo?retryWrites=true&w=majority", {
-})
+mongoose.connect("mongodb+srv://valmologestic:sanjay9523@cluster0.tb1f0.mongodb.net/valmoDB?retryWrites=true&w=majority&appName=Cluster0", {
+})  
   .then(() => console.log("MongoDB connected"))
   .catch(err => console.log(err));
 // Define Schema and Model
