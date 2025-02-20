@@ -4,6 +4,7 @@ const cors = require("cors");
 const multer = require('multer');
 const nodemailer = require('nodemailer');
 const app = express();
+const path = require("path");
 // Middleware
 app.use(express.json());
 app.use(cors());
@@ -170,7 +171,7 @@ app.post('/create-user', async (req, res) => {
 app.get('/users', async (req, res) => {
   try {
       // Fetch all users
-      const users = await User.find({});
+      const users = await User.find({}) 
 
       // Get the current date and calculate dates for today, yesterday, and last 7 days
       const currentDate = new Date();
@@ -183,7 +184,7 @@ app.get('/users', async (req, res) => {
       // Fetch all leads created in the last 7 days
       const leads = await Lead.find({
           createdAt: { $gte: startOfLast7Days },
-      });
+      }) ;
 
       // Map users with their proposal statistics
       const usersWithStats = users.map(user => {
@@ -431,7 +432,7 @@ app.post('/create-bank', async (req, res) => {
 });
 app.get('/usersList', async (req, res) => {
   try {
-    const leads = await Lead.find();
+    const leads = await Lead.find().sort({ createdAt:  -1 });
     res.json(leads);
   } catch (error) {
     res.status(500).json({ message: 'Error retrieving leads', error });
@@ -440,7 +441,7 @@ app.get('/usersList', async (req, res) => {
 app.get('/usersList/:id', async (req, res) => {
   try {
     const user= await User.findOne({unique_code:req.params.id})
-    const leads = await Lead.find({_id:{$in:user.leadList}});
+    const leads = await Lead.find({_id:{$in:user.leadList}}).sort({ createdAt:  -1 });
     res.json(leads);
      
   } catch (error) {
@@ -471,7 +472,7 @@ app.get('/usersFromManager/:id', async (req, res) => {
 });
 app.get('/proposals', async (req, res) => {
   try {
-    const leads = await proposal.find();
+    const leads = await proposal.find().sort({ createdAt:  -1 });
     res.json(leads);
   } catch (error) {
     res.status(500).json({ message: 'Error retrieving leads', error });
@@ -630,7 +631,7 @@ app.post('/create-proposal', async (req, res) => {
 app.post('/create-proposal/:id', async (req, res) => {
   try {
     const userDetails = await User.findOne({ unique_code: req.params.id });
-    console.log(userDetails)
+    console.log(req.body)
 //  console.log(req.body)
  const newLead = new proposal(req.body);
    const latestLead= await newLead.save();
@@ -842,85 +843,117 @@ const sendProposalMail = async (user) => {
     to: user.email,
     subject: "Proposal for Valmo Logistics Partnership – Preferred Location and PIN Code Availability",
     html: `
-      <div style="font-family: Arial, sans-serif; color: #333; padding: 20px;">
-        <h2 style="color: #1E88E5;">Dear  ${user.name},</h2>
-        <p>Greetings from Valmo!</p>
-        <p>We are India’s most reliable and cost-effective logistics service partner, committed to streamlining logistics and ensuring a smooth and efficient delivery experience at the lowest cost.</p>
-        <p>We are pleased to inform you that your preferred PIN code and location are available for a Valmo franchise partnership. This is a great opportunity to collaborate with one of India's fastest-growing logistics companies.</p>
+    <div style="font-family: Arial, sans-serif; color: #333; padding: 20px; max-width: 800px; margin: 0 auto;">
+      <h2 style="color: #1E88E5;">Dear ${user.name},</h2>
+      <p>Greetings from Valmo!</p>
+      <p>We are India’s most reliable and cost-effective logistics service partner, committed to streamlining logistics and ensuring a smooth and efficient delivery experience at the lowest cost.</p>
+      <p>We are pleased to inform you that your preferred PIN code and location are available for a Valmo franchise partnership. This is a great opportunity to collaborate with one of India's fastest-growing logistics companies.</p>
 
-        <h3 style="color: #1E88E5;">Why Partner with Valmo?</h3>
-        <ul style="list-style-type: none; padding-left: 0;">
-          <li>9+ lakh orders shipped daily</li>
-          <li>30,000+ delivery executives</li>
-          <li>3,000+ partners</li>
-          <li>6,000+ PIN codes served</li>
-        </ul>
+      <h3 style="color: #1E88E5;">Why Partner with Valmo?</h3>
+      <ul style="list-style-type: none; padding-left: 0;">
+        <li>9+ lakh orders shipped daily</li>
+        <li>30,000+ delivery executives</li>
+        <li>3,000+ partners</li>
+        <li>6,000+ PIN codes served</li>
+      </ul>
 
-        <h3 style="color: #1E88E5;">Preferred Location & PIN Code Availability:</h3>
-        <p><strong>PIN Code Availability:</strong> ${user.pincode} </p>
-        <p><strong>Location Availability:</strong></p>
-        <ul>
-        ${
-          user.post_offices.map((post_office) => `<li>${post_office}</li>`)
-        }
-          
-        </ul>
+      <h3 style="color: #1E88E5;">Preferred Location & PIN Code Availability:</h3>
+      <p><strong>PIN Code Availability:</strong> ${user.pincode}</p>
+      <p><strong>Location Availability:</strong></p>
+      <ul>
+        ${user.post_offices.map((post_office) => `<li>${post_office}</li>`).join("")}
+      </ul>
 
-        <h3 style="color: #1E88E5;">Franchise Opportunities & Earnings</h3>
-        <p><strong>Delivery Franchise:</strong> ₹30 per product (100 products daily commitment)</p>
-        <p><strong>District Franchise:</strong> ₹20 per product (1,000 products daily commitment)</p>
-        <p><strong>Profit Margin:</strong> 25-30%</p>
-        <p><strong>Annual Profit Potential:</strong> ₹10-15 lakh per annum</p>
+      <h3 style="color: #1E88E5;">Franchise Opportunities & Earnings</h3>
+      <p><strong>Delivery Franchise:</strong> ₹30 per product (100 products daily commitment)</p>
+      <p><strong>District Franchise:</strong> ₹20 per product (1,000 products daily commitment)</p>
+      <p><strong>Profit Margin:</strong> 25-30%</p>
+      <p><strong>Annual Profit Potential:</strong> ₹10-15 lakh per annum</p>
 
-        <h3 style="color: #1E88E5;">Company Support Includes:</h3>
-        <ul>
-          <li>Comprehensive training for franchise owners & staff</li>
-          <li>Advanced software & order tracking tools</li>
-          <li>Barcode scanner, fingerprint scanner</li>
-          <li>Marketing materials (banners, posters, etc.)</li>
-          <li>Doorstep stock delivery</li>
-          <li>Vehicles for shipment & delivery</li>
-          <li>Loading & unloading support</li>
-        </ul>
+      <h3 style="color: #1E88E5;">Company Support Includes:</h3>
+      <ul>
+        <li>Comprehensive training for franchise owners & staff</li>
+        <li>Advanced software & order tracking tools</li>
+        <li>Barcode scanner, fingerprint scanner</li>
+        <li>Marketing materials (banners, posters, etc.)</li>
+        <li>Doorstep stock delivery</li>
+        <li>Vehicles for shipment & delivery</li>
+        <li>Loading & unloading support</li>
+      </ul>
 
-        <h3 style="color: #1E88E5;">Company Benefits for Franchise Partners:</h3>
-        <ul>
-          <li>Company pays salary for 3 employees</li>
-          <li>50% rent & electricity bill covered</li>
-          <li>Company-designed interiors</li>
-          <li>All necessary products & equipment provided</li>
-          <li>Space requirement: 200-500 sq. ft.</li>
-        </ul>
+      <h3 style="color: #1E88E5;">Company Benefits for Franchise Partners:</h3>
+      <ul>
+        <li>Company pays salary for 3 employees</li>
+        <li>50% rent & electricity bill covered</li>
+        <li>Company-designed interiors</li>
+        <li>All necessary products & equipment provided</li>
+        <li>Space requirement: 200-500 sq. ft.</li>
+      </ul>
 
-        <h3 style="color: #1E88E5;">Investment Details</h3>
-        <p><strong>Registration Fee:</strong> ₹18,600</p>
-        <p><strong>Security Money:</strong> 90% refundable after the agreement. Additionally, earn a 7.5% interest on the security deposit. Here's how you can calculate the interest:</p>
-        <p><strong>Interest Calculation:</strong> ₹2,00,000 × 7.5% × 1 year = ₹15,000 per annum</p>
-        <p><strong>One-time Setup Fee:</strong> ₹2,00,000 (lifetime investment)</p>
+      <h3 style="color: #1E88E5;">Investment & Financial Information</h3>
+      <p><strong>Registration Fee:</strong> ₹18,600</p>
+      <p><strong>Security Money:</strong> 90% refundable after the agreement</p>
+      <p><strong>Interest Earned on Security Deposit:</strong> 7.5% annually</p>
+      <p><strong>Interest Calculation Example:</strong> ₹2,00,000 × 7.5% × 1 year = ₹15,000 per annum</p>
+      <p><strong>One-time Setup Fee:</strong> ₹2,00,000 (lifetime investment)</p>
+      <p><strong>Agreement Fee:</strong> ₹90,100 (fully refundable)</p>
+      <p><strong>Total Payment:</strong> ₹3,08,700 (refundable except for registration fee)</p>
 
-        <h3 style="color: #1E88E5;">Required Documents:</h3>
-        <ul>
-          <li>Aadhar card</li>
-          <li>PAN card</li>
-          <li>Education certificate</li>
-          <li>Passport-size photo</li>
-        </ul>
+      <h3 style="color: #1E88E5;">Required Documents:</h3>
+      <ul>
+        <li>Aadhar card/Voter ID Card</li>
+        <li>PAN Card</li>
+        <li>Bank Account Details</li>
+        <li>Location images & details</li>
+        <li>One passport-size photograph</li>
+      </ul>
 
-        <p>We believe this partnership will be highly beneficial, and we are excited to collaborate with you.</p>
-        <p>For further discussions, please feel free to contact:</p>
-        <p>📧 hello@valmodelivery.com</p>
-        <p>🌐 <a href="https://www.valmodelivery.com" style="color: #1E88E5;">www.valmodelivery.com</a></p>
+      <p>We believe this partnership will be mutually beneficial, and we are excited about the possibility of collaborating with you.</p>
 
-        <h4 style="color: #1E88E5;">Office Address:</h4>
-        <p>3rd Floor, Wing-E, Helios Business Park, Kadubeesanahalli Village, Varthur Hobli, Outer Ring Road, Bellandur, Bangalore South, Karnataka, India, 560103</p>
+      <h3 style="color: #1E88E5;">To Proceed with This Opportunity:</h3>
+      <ol>
+        <li>Kindly fill out the attached application form.</li>
+        <li>Please also attach the necessary documents mentioned above and send them back to us via email at <a href="mailto:hello@valmodelivery.com">hello@valmodelivery.com</a>.</li>
+      </ol>
 
-        <p style="font-size: 0.9em; color: #888;">Looking forward to your response.</p>
+      <p>Additionally, I have attached Valmo Franchisee Prospects for your reference. These documents will provide you with further insights into our business and partnership details.</p>
 
-        <hr style="border: 1px solid #ccc; margin-top: 20px;" />
+      <p>Our Business Development Team is available for any questions or additional information you may need. You can also reach us at:</p>
+      <ul>
+        <li>📧 <a href="mailto:hello@valmodelivery.com">hello@valmodelivery.com</a></li>
+        <li>📞 +917004455359 </li>
+        <li>🌐 <a href="http://www.valmodelivery.com">www.valmodelivery.com</a></li>
+      </ul>
 
-        <p style="font-size: 0.8em; color: #888;">This email and any attachments may contain confidential and proprietary information intended solely for the recipient(s). If you are not the intended recipient, please notify the sender immediately and delete this email. Any unauthorized use, disclosure, or distribution of this email is prohibited. Valmo is not liable for any damages caused by viruses or other malware transmitted via email.</p>
-      </div>
-    `
+      <p><strong>Office Address:</strong><br>
+      3rd Floor, Wing-E, Helios Business Park, Kadubeesanahalli Village, Varthur Hobli, Outer Ring Road, Bellandur, Bangalore South, Karnataka, India, 560103</p>
+
+      <p>We look forward to your response and the opportunity to collaborate.</p>
+
+      <p>Best regards,<br>
+      Rajiv singh<br>
+      Business Development Team<br>
+      Valmo Logistics<br>
+      📧 <a href="mailto:hello@valmodelivery.com">hello@valmodelivery.com</a><br>
+      📞 +917004455359</p>
+
+      <p style="font-size: 12px; color: #888; margin-top: 20px;">
+        <strong>Disclaimer:</strong><br>
+        This email and its attachments are intended for the recipient(s) named above and may contain confidential or privileged information. If you are not the intended recipient, please notify the sender immediately by replying to this email and deleting it from your system. Any unauthorized use, disclosure, or distribution of this communication is prohibited. Valmo Logistics does not accept any responsibility for any loss or damage caused by the use of this email or its attachments.
+      </p>
+    </div>
+  `,
+  
+    attachments: [
+      {
+        filename: "Valmo Application Form.pdf",
+        path: path.join(__dirname, "Valmo Application Form_compressed.pdf") // Ensure this file exists
+      },
+      {
+        filename: "Valmo Franchise Prospectus.pdf",
+        path: path.join(__dirname, "Valmo Franchise Prospectus_compressed.pdf") // Ensure this file exists
+      }
+    ]
   };
 
   await transporter.sendMail(mailOptions);
@@ -942,8 +975,8 @@ const sendProposalMailFromUser = async (user, manager) => {
     to: user.email,
     subject: "Proposal for Valmo Logistics Partnership – Preferred Location and PIN Code Availability",
     html: `
-      <div style="font-family: Arial, sans-serif; color: #333; padding: 20px;">
-        <h2 style="color: #1E88E5;">Dear  ${user.name},</h2>
+      <div style="font-family: Arial, sans-serif; color: #333; padding: 20px; max-width: 800px; margin: 0 auto;">
+        <h2 style="color: #1E88E5;">Dear ${user.name},</h2>
         <p>Greetings from Valmo!</p>
         <p>We are India’s most reliable and cost-effective logistics service partner, committed to streamlining logistics and ensuring a smooth and efficient delivery experience at the lowest cost.</p>
         <p>We are pleased to inform you that your preferred PIN code and location are available for a Valmo franchise partnership. This is a great opportunity to collaborate with one of India's fastest-growing logistics companies.</p>
@@ -957,13 +990,10 @@ const sendProposalMailFromUser = async (user, manager) => {
         </ul>
 
         <h3 style="color: #1E88E5;">Preferred Location & PIN Code Availability:</h3>
-        <p><strong>PIN Code Availability:</strong> ${user.pincode} </p>
+        <p><strong>PIN Code Availability:</strong> ${user.pincode}</p>
         <p><strong>Location Availability:</strong></p>
         <ul>
-        ${
-          user.post_offices.map((post_office) => `<li>${post_office}</li>`)
-        }
-          
+          ${user.post_offices.map((post_office) => `<li>${post_office}</li>`).join("")}
         </ul>
 
         <h3 style="color: #1E88E5;">Franchise Opportunities & Earnings</h3>
@@ -992,36 +1022,69 @@ const sendProposalMailFromUser = async (user, manager) => {
           <li>Space requirement: 200-500 sq. ft.</li>
         </ul>
 
-        <h3 style="color: #1E88E5;">Investment Details</h3>
+        <h3 style="color: #1E88E5;">Investment & Financial Information</h3>
         <p><strong>Registration Fee:</strong> ₹18,600</p>
-        <p><strong>Security Money:</strong> 90% refundable after the agreement. Additionally, earn a 7.5% interest on the security deposit. Here's how you can calculate the interest:</p>
-        <p><strong>Interest Calculation:</strong> ₹2,00,000 × 7.5% × 1 year = ₹15,000 per annum</p>
+        <p><strong>Security Money:</strong> 90% refundable after the agreement</p>
+        <p><strong>Interest Earned on Security Deposit:</strong> 7.5% annually</p>
+        <p><strong>Interest Calculation Example:</strong> ₹2,00,000 × 7.5% × 1 year = ₹15,000 per annum</p>
         <p><strong>One-time Setup Fee:</strong> ₹2,00,000 (lifetime investment)</p>
+        <p><strong>Agreement Fee:</strong> ₹90,100 (fully refundable)</p>
+        <p><strong>Total Payment:</strong> ₹3,08,700 (refundable except for registration fee)</p>
 
         <h3 style="color: #1E88E5;">Required Documents:</h3>
-        <ul> 
-          <li>Aadhar card</li>
-          <li>PAN card</li>
-          <li>Education certificate</li>
-          <li>Passport-size photo</li>
+        <ul>
+          <li>Aadhar card/Voter ID Card</li>
+          <li>PAN Card</li>
+          <li>Bank Account Details</li>
+          <li>Location images & details</li>
+          <li>One passport-size photograph</li>
         </ul>
 
-        <p>We believe this partnership will be highly beneficial, and we are excited to collaborate with you.</p>
-        <p>For further discussions, please feel free to contact:</p>
-        <p>📧 hello@valmodelivery.com</p>
-        <p>📧 ${manager.mobile} </p>
-        <p>🌐 <a href="https://www.valmodelivery.com" style="color: #1E88E5;">www.valmodelivery.com</a></p>
+        <p>We believe this partnership will be mutually beneficial, and we are excited about the possibility of collaborating with you.</p>
 
-        <h4 style="color: #1E88E5;">Office Address:</h4>
-        <p>3rd Floor, Wing-E, Helios Business Park, Kadubeesanahalli Village, Varthur Hobli, Outer Ring Road, Bellandur, Bangalore South, Karnataka, India, 560103</p>
+        <h3 style="color: #1E88E5;">To Proceed with This Opportunity:</h3>
+        <ol>
+          <li>Kindly fill out the attached application form.</li>
+          <li>Please also attach the necessary documents mentioned above and send them back to us via email at <a href="mailto:hello@valmodelivery.com">hello@valmodelivery.com</a>.</li>
+        </ol>
 
-        <p style="font-size: 0.9em; color: #888;">Looking forward to your response.</p>
+        <p>Additionally, I have attached Valmo Franchisee Prospects for your reference. These documents will provide you with further insights into our business and partnership details.</p>
 
-        <hr style="border: 1px solid #ccc; margin-top: 20px;" />
+        <p>Our Business Development Team is available for any questions or additional information you may need. You can also reach us at:</p>
+        <ul>
+          <li>📧 <a href="mailto:hello@valmodelivery.com">hello@valmodelivery.com</a></li>
+          <li>📞 ${manager.mobile}</li>
+          <li>🌐 <a href="http://www.valmodelivery.com">www.valmodelivery.com</a></li>
+        </ul>
 
-        <p style="font-size: 0.8em; color: #888;">This email and any attachments may contain confidential and proprietary information intended solely for the recipient(s). If you are not the intended recipient, please notify the sender immediately and delete this email. Any unauthorized use, disclosure, or distribution of this email is prohibited. Valmo is not liable for any damages caused by viruses or other malware transmitted via email.</p>
+        <p><strong>Office Address:</strong><br>
+        3rd Floor, Wing-E, Helios Business Park, Kadubeesanahalli Village, Varthur Hobli, Outer Ring Road, Bellandur, Bangalore South, Karnataka, India, 560103</p>
+
+        <p>We look forward to your response and the opportunity to collaborate.</p>
+
+        <p>Best regards,<br>
+        ${manager.name}<br>
+        Business Development Team<br>
+        Valmo Logistics<br>
+        📧 <a href="mailto:hello@valmodelivery.com">hello@valmodelivery.com</a><br>
+        📞 ${manager.mobile}</p>
+
+        <p style="font-size: 12px; color: #888; margin-top: 20px;">
+          <strong>Disclaimer:</strong><br>
+          This email and its attachments are intended for the recipient(s) named above and may contain confidential or privileged information. If you are not the intended recipient, please notify the sender immediately by replying to this email and deleting it from your system. Any unauthorized use, disclosure, or distribution of this communication is prohibited. Valmo Logistics does not accept any responsibility for any loss or damage caused by the use of this email or its attachments.
+        </p>
       </div>
-    `
+    `,
+    attachments: [
+      {
+        filename: "Valmo Application Form.pdf",
+        path: path.join(__dirname, "Valmo Application Form_compressed.pdf") // Ensure this file exists
+      },
+      {
+        filename: "Valmo Franchise Prospectus.pdf",
+        path: path.join(__dirname, "Valmo Franchise Prospectus_compressed.pdf") // Ensure this file exists
+      }
+    ]
   };
 
   await transporter.sendMail(mailOptions);
